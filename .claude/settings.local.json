@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -v \"^.*//.*ImageProcessingDatasource\")"
+      "Bash(grep -v \"^.*//.*ImageProcessingDatasource\")",
+      "Bash(grep -v \"^.*//.*ShotPattern\")"
     ]
   }
 }
