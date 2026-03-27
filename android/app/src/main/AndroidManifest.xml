@@ -55,4 +55,11 @@
             <data android:mimeType="text/plain" />
         </intent>
     </queries>
+
+    <!-- Required by permission_handler to open app settings -->
+    <queries>
+        <intent>
+            <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
+        </intent>
+    </queries>
 </manifest>

@@ -7,4 +7,5 @@ abstract interface class CameraRepository {
   Future<Result<void>> dispose();
   Future<Result<void>> setZoomLevel(double zoom);
   Future<Result<void>> setFlashMode(bool enabled);
+  Future<Result<void>> setFocusPoint(double x, double y);
 }

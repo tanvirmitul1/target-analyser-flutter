@@ -39,4 +39,11 @@ class CameraRepositoryImpl implements CameraRepository {
         () => _datasource.setFlashMode(enabled),
         onError: (e, st) => CameraFailure('Failed to set flash.', cause: e),
       );
+
+  @override
+  Future<Result<void>> setFocusPoint(double x, double y) => guard(
+        () => _datasource.setFocusPoint(x, y),
+        onError: (e, st) =>
+            CameraFailure('Failed to set focus point.', cause: e),
+      );
 }
