@@ -10,6 +10,9 @@ class ProcessedImageModel {
     required this.shotX,
     required this.shotY,
     required this.processedAt,
+    required this.imageWidthPx,
+    required this.imageHeightPx,
+    required this.allShots,
     this.usedFallback = false,
   });
 
@@ -21,6 +24,11 @@ class ProcessedImageModel {
   final double shotX;
   final double shotY;
   final String processedAt;
+  final int    imageWidthPx;
+  final int    imageHeightPx;
+
+  /// All detected shot centres in image-pixel space.
+  final List<ShotPoint> allShots;
 
   /// Mirrors [ProcessedImage.usedFallback].
   final bool usedFallback;
@@ -34,6 +42,9 @@ class ProcessedImageModel {
         shotX:          shotX,
         shotY:          shotY,
         processedAt:    DateTime.parse(processedAt),
+        imageWidthPx:   imageWidthPx,
+        imageHeightPx:  imageHeightPx,
+        allShots:       allShots,
         usedFallback:   usedFallback,
       );
 }

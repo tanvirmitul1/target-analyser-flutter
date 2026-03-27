@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/utils/logger.dart';
+import '../../domain/entities/processed_image.dart';
 import '../models/processed_image_model.dart';
 import 'base_processing_datasource.dart';
 
@@ -28,7 +29,10 @@ class ImageProcessingDatasource implements BaseProcessingDatasource {
   const ImageProcessingDatasource();
 
   @override
-  Future<ProcessedImageModel> processImage(String imagePath) async {
+  Future<ProcessedImageModel> processImage(
+    String imagePath, {
+    bool debugMode = false, // accepted but not used by the Dart fallback
+  }) async {
     AppLogger.i('ImageProcessingDatasource: processing "$imagePath" (Dart fallback)');
     final sw = Stopwatch()..start();
 
@@ -54,6 +58,9 @@ class ImageProcessingDatasource implements BaseProcessingDatasource {
       shotX:          result.shotX,
       shotY:          result.shotY,
       processedAt:    DateTime.now().toUtc().toIso8601String(),
+      imageWidthPx:   result.imageWidth,
+      imageHeightPx:  result.imageHeight,
+      allShots:       [ShotPoint(result.shotX, result.shotY)],
       usedFallback:   true,
     );
   }
@@ -85,12 +92,16 @@ final class _IsolateResult {
     required this.radius,
     required this.shotX,
     required this.shotY,
+    required this.imageWidth,
+    required this.imageHeight,
   });
   final double centreX;
   final double centreY;
   final double radius;
   final double shotX;
   final double shotY;
+  final int    imageWidth;
+  final int    imageHeight;
 }
 
 // ── Top-level isolate function ────────────────────────────────────────────────
@@ -118,11 +129,13 @@ Future<_IsolateResult> _processInIsolate(_IsolateArgs args) async {
   await File(args.outputPath).writeAsBytes(encoded, flush: true);
 
   return _IsolateResult(
-    centreX: centreX,
-    centreY: centreY,
-    radius:  radius,
-    shotX:   shotX.toDouble(),
-    shotY:   shotY.toDouble(),
+    centreX:     centreX,
+    centreY:     centreY,
+    radius:      radius,
+    shotX:       shotX.toDouble(),
+    shotY:       shotY.toDouble(),
+    imageWidth:  image.width,
+    imageHeight: image.height,
   );
 }
 

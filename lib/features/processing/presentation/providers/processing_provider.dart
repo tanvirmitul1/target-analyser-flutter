@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/debug_config.dart';
 import '../../../../core/services/opencv_bridge.dart';
 import '../../data/datasources/base_processing_datasource.dart';
 import '../../data/datasources/image_processing_datasource.dart';
@@ -16,13 +17,19 @@ final dartProcessingDatasourceProvider = Provider<ImageProcessingDatasource>(
   (ref) => const ImageProcessingDatasource(),
 );
 
-/// OpenCV datasource — primary.  Falls back to [dartProcessingDatasourceProvider]
-/// internally if the platform channel is unavailable.
+/// OpenCV datasource — primary.
+///
+/// Rebuilds when [debugModeProvider] changes so the native layer immediately
+/// reflects the new flag on the next processing call.
 final openCvProcessingDatasourceProvider = Provider<BaseProcessingDatasource>(
-  (ref) => OpenCvProcessingDatasource(
-    bridge: OpenCvBridge.instance,
-    fallback: ref.watch(dartProcessingDatasourceProvider),
-  ),
+  (ref) {
+    final debug = ref.watch(debugModeProvider);
+    return OpenCvProcessingDatasource(
+      bridge:    OpenCvBridge.instance,
+      fallback:  ref.watch(dartProcessingDatasourceProvider),
+      debugMode: debug,
+    );
+  },
 );
 
 final processingRepositoryProvider = Provider<ProcessingRepository>(

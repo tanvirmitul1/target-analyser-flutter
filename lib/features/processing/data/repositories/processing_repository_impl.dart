@@ -10,7 +10,7 @@ class ProcessingRepositoryImpl implements ProcessingRepository {
   @override
   Future<Result<ProcessedImage>> processImage(String imagePath) => guard(
         () async {
-          final model = await _datasource.processImage(imagePath);
+          final model = await _datasource.processImage(imagePath, debugMode: false);
           return model.toDomain();
         },
         onError: (e, st) =>

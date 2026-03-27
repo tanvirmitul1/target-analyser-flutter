@@ -106,11 +106,13 @@ class MainActivity : FlutterActivity() {
             return
         }
 
+        val debugMode = call.argument<Boolean>("debugMode") ?: false
+
         // Dispatch to background thread.
         val outputDir = cacheDir.absolutePath
         try {
             processingExecutor.execute {
-                runProcessing(processor, imagePath, outputDir, result)
+                runProcessing(processor, imagePath, outputDir, debugMode, result)
             }
         } catch (e: RejectedExecutionException) {
             result.error(
@@ -131,10 +133,11 @@ class MainActivity : FlutterActivity() {
         processor: ImageProcessor,
         imagePath: String,
         outputDir: String,
+        debugMode: Boolean,
         result: MethodChannel.Result,
     ) {
         try {
-            val json = processor.process(imagePath, outputDir)
+            val json = processor.process(imagePath, outputDir, debugMode)
             mainHandler.post { result.success(json) }
         } catch (e: IllegalArgumentException) {
             Log.w(TAG, "processImage — bad input: ${e.message}")

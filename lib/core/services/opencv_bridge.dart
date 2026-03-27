@@ -6,8 +6,8 @@ import '../models/opencv_result.dart';
 import '../utils/logger.dart';
 import '../utils/result.dart';
 
-/// Flutter-side singleton that owns the [MethodChannel] to
-/// the native `image_processor` channel registered in [MainActivity.kt].
+/// Flutter-side singleton that owns the [MethodChannel] to the native
+/// `image_processor` channel registered in [MainActivity.kt].
 ///
 /// Usage:
 /// ```dart
@@ -22,23 +22,27 @@ class OpenCvBridge {
 
   static const OpenCvBridge instance = OpenCvBridge._();
 
-  // Must match [CHANNEL] constant in MainActivity.kt.
+  // Must match [CHANNEL] in MainActivity.kt.
   static const MethodChannel _channel = MethodChannel('image_processor');
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
-  /// Sends [imagePath] to the native layer for OpenCV processing.
+  /// Sends [imagePath] to the native OpenCV layer for processing.
   ///
-  /// Returns [Success<OpenCvResult>] on success or a typed [ProcessingFailure]
-  /// on any error — PlatformException codes are preserved in the failure
-  /// message for diagnostics.
-  Future<Result<OpenCvResult>> processImage(String imagePath) async {
-    AppLogger.d('OpenCvBridge → processImage("$imagePath")');
+  /// [debugMode] forwards the flag to the Kotlin [ImageProcessor]; when true
+  /// extra annotations are drawn and additional diagnostics are logged.
+  ///
+  /// Returns [Success<OpenCvResult>] on success or a typed [ProcessingFailure].
+  Future<Result<OpenCvResult>> processImage(
+    String imagePath, {
+    bool debugMode = false,
+  }) async {
+    AppLogger.d('OpenCvBridge → processImage("$imagePath" debug=$debugMode)');
 
     try {
       final raw = await _channel.invokeMethod<String>(
         'processImage',
-        {'path': imagePath},
+        {'path': imagePath, 'debugMode': debugMode},
       );
 
       if (raw == null || raw.isEmpty) {
@@ -47,12 +51,13 @@ class OpenCvBridge {
         );
       }
 
-      final json = jsonDecode(raw) as Map<String, dynamic>;
+      final json   = jsonDecode(raw) as Map<String, dynamic>;
       final result = OpenCvResult.fromJson(json);
 
       AppLogger.i(
         'OpenCvBridge ← centre=${result.center} '
         'shots=${result.shots.length} '
+        'meta=${result.meta} '
         'debug=${result.debug}',
       );
 
@@ -62,9 +67,7 @@ class OpenCvBridge {
       final msg  = e.message ?? 'Platform error';
       AppLogger.e('OpenCvBridge PlatformException [$code]: $msg',
           error: e, stackTrace: st);
-      return Failure(
-        ProcessingFailure('[$code] $msg', cause: e),
-      );
+      return Failure(ProcessingFailure('[$code] $msg', cause: e));
     } on FormatException catch (e, st) {
       AppLogger.e('OpenCvBridge JSON parse error', error: e, stackTrace: st);
       return Failure(
