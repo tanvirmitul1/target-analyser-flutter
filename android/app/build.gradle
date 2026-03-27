@@ -43,6 +43,12 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
+
+        ndk {
+            // Limit to modern ABIs — removes x86 (emulator-only) to reduce APK size.
+            // Add 'x86_64' back if you need emulator support.
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
     }
 
     buildTypes {
@@ -66,4 +72,11 @@ flutter {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation "androidx.multidex:multidex:2.0.1"
+
+    // OpenCV — official Maven Central artifact (bundles native .so for all ABIs).
+    // https://mvnrepository.com/artifact/org.opencv/opencv
+    implementation 'org.opencv:opencv:4.9.0'
+
+    // Kotlin coroutines (for background processing in MainActivity).
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 }

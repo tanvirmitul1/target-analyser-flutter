@@ -11,3 +11,8 @@
 
 # audioplayers
 -keep class xyz.luan.audioplayers.** { *; }
+
+# OpenCV
+-keep class org.opencv.** { *; }
+-keepclassmembers class org.opencv.** { *; }
+-dontwarn org.opencv.**

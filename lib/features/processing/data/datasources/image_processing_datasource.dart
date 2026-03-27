@@ -7,16 +7,16 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/utils/logger.dart';
 import '../models/processed_image_model.dart';
+import 'base_processing_datasource.dart';
 
-/// Image processing logic using the `image` package.
+/// Pure-Dart fallback image processor using the `image` package.
 ///
-/// Current implementation uses a simplified heuristic approach:
-/// - Target centre is assumed to be the geometric centre of the image.
-/// - Target radius is estimated as 40% of the shorter image dimension.
-/// - Shot detection finds the darkest region cluster.
-///
-/// Replace these heuristics with ML-based or OpenCV approaches for production.
-class ImageProcessingDatasource {
+/// Used when the OpenCV platform channel is unavailable (e.g. iOS, unit tests).
+/// Detection heuristics:
+///  - Target centre = geometric centre of the image.
+///  - Target radius = 40 % of the shorter dimension.
+///  - Shot = darkest pixel cluster within the target circle.
+class ImageProcessingDatasource implements BaseProcessingDatasource {
   Future<ProcessedImageModel> processImage(String imagePath) async {
     AppLogger.i('Processing image: $imagePath');
 

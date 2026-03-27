@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/services/opencv_bridge.dart';
+import '../../data/datasources/base_processing_datasource.dart';
 import '../../data/datasources/image_processing_datasource.dart';
+import '../../data/datasources/opencv_processing_datasource.dart';
 import '../../data/repositories/processing_repository_impl.dart';
 import '../../domain/entities/processed_image.dart';
 import '../../domain/repositories/processing_repository.dart';
@@ -8,12 +11,24 @@ import '../../domain/usecases/process_image_usecase.dart';
 
 // ── Infrastructure ────────────────────────────────────────────────────────────
 
-final imageProcessingDatasourceProvider = Provider<ImageProcessingDatasource>(
-  (ref) => ImageProcessingDatasource(),
+/// Pure-Dart fallback datasource (no native dependency).
+final dartProcessingDatasourceProvider = Provider<ImageProcessingDatasource>(
+  (ref) => const ImageProcessingDatasource(),
+);
+
+/// OpenCV datasource — primary.  Falls back to [dartProcessingDatasourceProvider]
+/// internally if the platform channel is unavailable.
+final openCvProcessingDatasourceProvider = Provider<BaseProcessingDatasource>(
+  (ref) => OpenCvProcessingDatasource(
+    bridge: OpenCvBridge.instance,
+    fallback: ref.watch(dartProcessingDatasourceProvider),
+  ),
 );
 
 final processingRepositoryProvider = Provider<ProcessingRepository>(
-  (ref) => ProcessingRepositoryImpl(ref.watch(imageProcessingDatasourceProvider)),
+  (ref) => ProcessingRepositoryImpl(
+    ref.watch(openCvProcessingDatasourceProvider),
+  ),
 );
 
 final processImageUseCaseProvider = Provider<ProcessImageUseCase>(
@@ -40,5 +55,7 @@ class ProcessingNotifier extends FamilyAsyncNotifier<ProcessedImage, String> {
   }
 }
 
-final processingProvider = AsyncNotifierProviderFamily<ProcessingNotifier,
-    ProcessedImage, String>(ProcessingNotifier.new);
+final processingProvider =
+    AsyncNotifierProviderFamily<ProcessingNotifier, ProcessedImage, String>(
+  ProcessingNotifier.new,
+);
