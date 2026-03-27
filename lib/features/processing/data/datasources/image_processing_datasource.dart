@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -11,109 +12,184 @@ import 'base_processing_datasource.dart';
 
 /// Pure-Dart fallback image processor using the `image` package.
 ///
-/// Used when the OpenCV platform channel is unavailable (e.g. iOS, unit tests).
-/// Detection heuristics:
-///  - Target centre = geometric centre of the image.
-///  - Target radius = 40 % of the shorter dimension.
-///  - Shot = darkest pixel cluster within the target circle.
+/// Used when the OpenCV platform channel is unavailable (iOS, unit tests, or
+/// when OpenCV initialisation fails on-device).
+///
+/// ## Algorithm
+/// - Target centre  = geometric centre of the image.
+/// - Target radius  = 40 % of the shorter edge.
+/// - Shot location  = darkest-pixel cluster inside the target circle.
+///
+/// ## Performance
+/// The full pixel scan is dispatched to a background isolate via [compute] so
+/// the Flutter UI thread and the platform thread are never blocked.
+/// [const ImageProcessingDatasource()] remains a zero-state singleton.
 class ImageProcessingDatasource implements BaseProcessingDatasource {
+  const ImageProcessingDatasource();
+
+  @override
   Future<ProcessedImageModel> processImage(String imagePath) async {
-    AppLogger.i('Processing image: $imagePath');
+    AppLogger.i('ImageProcessingDatasource: processing "$imagePath" (Dart fallback)');
+    final sw = Stopwatch()..start();
 
-    final bytes = await File(imagePath).readAsBytes();
-    img.Image? image = img.decodeImage(bytes);
-    if (image == null) throw StateError('Could not decode image at $imagePath');
+    // Output path is resolved on the main isolate (needs plugin context).
+    final outputPath = await _resolveOutputPath(imagePath);
 
-    final w = image.width;
-    final h = image.height;
-    final centreX = w / 2.0;
-    final centreY = h / 2.0;
-    final radius = math.min(w, h) * 0.40;
+    final result = await compute(
+      _processInIsolate,
+      _IsolateArgs(imagePath: imagePath, outputPath: outputPath),
+    );
 
-    // --- Shot detection (darkest pixel cluster) ---
-    final shotPoint = _findShotCentre(image, centreX, centreY, radius);
-
-    // --- Annotate image ---
-    _drawCircle(image, centreX.round(), centreY.round(), radius.round(),
-        img.ColorRgb8(255, 0, 0));
-    _drawCrosshair(image, shotPoint.$1, shotPoint.$2, img.ColorRgb8(0, 255, 0));
-
-    // --- Save processed image ---
-    final outputPath = await _saveProcessed(imagePath, image);
-
-    AppLogger.i('Processing complete → $outputPath');
+    AppLogger.i(
+      'ImageProcessingDatasource: done in ${sw.elapsedMilliseconds} ms '
+      'shot=(${result.shotX.toStringAsFixed(1)}, ${result.shotY.toStringAsFixed(1)})',
+    );
 
     return ProcessedImageModel(
-      originalPath: imagePath,
-      processedPath: outputPath,
-      centreX: centreX,
-      centreY: centreY,
-      targetRadiusPx: radius,
-      shotX: shotPoint.$1.toDouble(),
-      shotY: shotPoint.$2.toDouble(),
-      processedAt: DateTime.now().toIso8601String(),
+      originalPath:   imagePath,
+      processedPath:  outputPath,
+      centreX:        result.centreX,
+      centreY:        result.centreY,
+      targetRadiusPx: result.radius,
+      shotX:          result.shotX,
+      shotY:          result.shotY,
+      processedAt:    DateTime.now().toUtc().toIso8601String(),
+      usedFallback:   true,
     );
   }
 
-  // ── Private helpers ─────────────────────────────────────────────────────────
+  static Future<String> _resolveOutputPath(String imagePath) async {
+    final dir = Directory(
+      p.join((await getApplicationDocumentsDirectory()).path, 'processed'),
+    );
+    await dir.create(recursive: true);
+    final name =
+        'proc_${p.basenameWithoutExtension(imagePath)}'
+        '_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    return p.join(dir.path, name);
+  }
+}
 
-  (int, int) _findShotCentre(
-    img.Image image,
-    double centreX,
-    double centreY,
-    double radius,
-  ) {
-    var minLuma = 255;
-    var bestX = centreX.round();
-    var bestY = centreY.round();
+// ── Isolate boundary types ────────────────────────────────────────────────────
 
-    // Sample pixels within the target circle.
-    for (var y = 0; y < image.height; y++) {
-      for (var x = 0; x < image.width; x++) {
-        final dx = x - centreX;
-        final dy = y - centreY;
-        if (dx * dx + dy * dy > radius * radius) continue;
+final class _IsolateArgs {
+  const _IsolateArgs({required this.imagePath, required this.outputPath});
+  final String imagePath;
+  final String outputPath;
+}
 
-        final pixel = image.getPixel(x, y);
-        final luma =
-            (0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b).round();
-        if (luma < minLuma) {
-          minLuma = luma;
-          bestX = x;
-          bestY = y;
-        }
+final class _IsolateResult {
+  const _IsolateResult({
+    required this.centreX,
+    required this.centreY,
+    required this.radius,
+    required this.shotX,
+    required this.shotY,
+  });
+  final double centreX;
+  final double centreY;
+  final double radius;
+  final double shotX;
+  final double shotY;
+}
+
+// ── Top-level isolate function ────────────────────────────────────────────────
+
+/// All image work runs here — never on the main or platform thread.
+Future<_IsolateResult> _processInIsolate(_IsolateArgs args) async {
+  final bytes = await File(args.imagePath).readAsBytes();
+  final image = img.decodeImage(bytes);
+  if (image == null) {
+    throw StateError(
+        'ImageProcessingDatasource: cannot decode "${args.imagePath}"');
+  }
+
+  final w       = image.width.toDouble();
+  final h       = image.height.toDouble();
+  final centreX = w / 2.0;
+  final centreY = h / 2.0;
+  final radius  = math.min(w, h) * 0.40;
+
+  final (shotX, shotY) = _findShotCentre(image, centreX, centreY, radius);
+
+  _annotate(image, centreX, centreY, radius, shotX, shotY);
+
+  final encoded = img.encodeJpg(image, quality: 85);
+  await File(args.outputPath).writeAsBytes(encoded, flush: true);
+
+  return _IsolateResult(
+    centreX: centreX,
+    centreY: centreY,
+    radius:  radius,
+    shotX:   shotX.toDouble(),
+    shotY:   shotY.toDouble(),
+  );
+}
+
+// ── Image analysis helpers (run inside the isolate) ──────────────────────────
+
+/// Scans pixels inside the target circle and returns the centre of the
+/// darkest cluster (the bullet hole).
+(int, int) _findShotCentre(
+  img.Image image,
+  double centreX,
+  double centreY,
+  double radius,
+) {
+  var minLuma = 256;
+  var bestX   = centreX.round();
+  var bestY   = centreY.round();
+
+  final r2 = radius * radius;
+  final x0 = (centreX - radius).floor().clamp(0, image.width  - 1);
+  final x1 = (centreX + radius).ceil().clamp(0, image.width   - 1);
+  final y0 = (centreY - radius).floor().clamp(0, image.height - 1);
+  final y1 = (centreY + radius).ceil().clamp(0, image.height  - 1);
+
+  for (var y = y0; y <= y1; y++) {
+    for (var x = x0; x <= x1; x++) {
+      final dx = x - centreX;
+      final dy = y - centreY;
+      if (dx * dx + dy * dy > r2) continue;
+
+      final px    = image.getPixel(x, y);
+      final luma  = (0.299 * px.r + 0.587 * px.g + 0.114 * px.b).round();
+      if (luma < minLuma) {
+        minLuma = luma;
+        bestX   = x;
+        bestY   = y;
       }
     }
-    return (bestX, bestY);
+  }
+  return (bestX, bestY);
+}
+
+/// Draws target circle + shot crosshair onto [image] in-place.
+void _annotate(
+  img.Image image,
+  double cx,
+  double cy,
+  double radius,
+  int shotX,
+  int shotY,
+) {
+  final red   = img.ColorRgb8(220, 40,  40);
+  final green = img.ColorRgb8(40,  220, 40);
+
+  // Target boundary circle.
+  final r   = radius.round();
+  final icx = cx.round();
+  final icy = cy.round();
+  for (var angle = 0.0; angle < math.pi * 2; angle += 0.003) {
+    final px = (icx + r * math.cos(angle)).round().clamp(0, image.width  - 1);
+    final py = (icy + r * math.sin(angle)).round().clamp(0, image.height - 1);
+    image.setPixel(px, py, red);
   }
 
-  void _drawCircle(img.Image image, int cx, int cy, int r, img.Color color) {
-    for (var angle = 0.0; angle < math.pi * 2; angle += 0.005) {
-      final x = (cx + r * math.cos(angle)).round().clamp(0, image.width - 1);
-      final y = (cy + r * math.sin(angle)).round().clamp(0, image.height - 1);
-      image.setPixel(x, y, color);
-    }
-  }
-
-  void _drawCrosshair(img.Image image, int cx, int cy, img.Color color) {
-    const size = 20;
-    for (var i = -size; i <= size; i++) {
-      final x = (cx + i).clamp(0, image.width - 1);
-      final y = (cy + i).clamp(0, image.height - 1);
-      image.setPixel(x, cy, color);
-      image.setPixel(cx, y, color);
-    }
-  }
-
-  Future<String> _saveProcessed(String originalPath, img.Image image) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final processedDir = Directory(p.join(dir.path, 'processed'));
-    await processedDir.create(recursive: true);
-
-    final fileName =
-        'proc_${p.basenameWithoutExtension(originalPath)}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final outputPath = p.join(processedDir.path, fileName);
-    await File(outputPath).writeAsBytes(img.encodeJpg(image, quality: 90));
-    return outputPath;
+  // Shot crosshair.
+  const arm = 20;
+  for (var i = -arm; i <= arm; i++) {
+    image.setPixel((shotX + i).clamp(0, image.width  - 1), shotY, green);
+    image.setPixel(shotX, (shotY + i).clamp(0, image.height - 1), green);
   }
 }

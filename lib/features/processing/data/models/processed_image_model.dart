@@ -10,6 +10,7 @@ class ProcessedImageModel {
     required this.shotX,
     required this.shotY,
     required this.processedAt,
+    this.usedFallback = false,
   });
 
   final String originalPath;
@@ -21,14 +22,18 @@ class ProcessedImageModel {
   final double shotY;
   final String processedAt;
 
+  /// Mirrors [ProcessedImage.usedFallback].
+  final bool usedFallback;
+
   ProcessedImage toDomain() => ProcessedImage(
-        originalPath: originalPath,
-        processedPath: processedPath,
-        centreX: centreX,
-        centreY: centreY,
+        originalPath:   originalPath,
+        processedPath:  processedPath,
+        centreX:        centreX,
+        centreY:        centreY,
         targetRadiusPx: targetRadiusPx,
-        shotX: shotX,
-        shotY: shotY,
-        processedAt: DateTime.parse(processedAt),
+        shotX:          shotX,
+        shotY:          shotY,
+        processedAt:    DateTime.parse(processedAt),
+        usedFallback:   usedFallback,
       );
 }

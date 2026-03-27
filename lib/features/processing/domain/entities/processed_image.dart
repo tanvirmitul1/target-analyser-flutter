@@ -10,9 +10,10 @@ class ProcessedImage extends Equatable {
     required this.shotX,
     required this.shotY,
     required this.processedAt,
+    this.usedFallback = false,
   });
 
-  /// Path to the source image.
+  /// Path to the source image (may be the compressed version).
   final String originalPath;
 
   /// Path to the annotated output image.
@@ -31,9 +32,15 @@ class ProcessedImage extends Equatable {
 
   final DateTime processedAt;
 
-  /// Offset of shot from target centre, normalised by radius (-1.0 … 1.0).
-  double get normalisedOffsetX => (shotX - centreX) / targetRadiusPx;
-  double get normalisedOffsetY => (shotY - centreY) / targetRadiusPx;
+  /// True when native OpenCV processing failed and the pure-Dart fallback
+  /// detector was used instead.  Exposed to the UI so the user can be informed.
+  final bool usedFallback;
+
+  /// Offset of shot from target centre, normalised by radius (−1.0 … 1.0).
+  double get normalisedOffsetX =>
+      targetRadiusPx == 0 ? 0 : (shotX - centreX) / targetRadiusPx;
+  double get normalisedOffsetY =>
+      targetRadiusPx == 0 ? 0 : (shotY - centreY) / targetRadiusPx;
 
   @override
   List<Object?> get props => [
@@ -45,5 +52,6 @@ class ProcessedImage extends Equatable {
         shotX,
         shotY,
         processedAt,
+        usedFallback,
       ];
 }
