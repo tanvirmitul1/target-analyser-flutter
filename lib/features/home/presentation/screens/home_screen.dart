@@ -1,206 +1,114 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/utils/extensions.dart';
 import '../../../camera/presentation/screens/camera_screen.dart';
-import '../../../storage/presentation/providers/storage_provider.dart';
-import '../../../storage/presentation/screens/history_screen.dart';
-import '../providers/home_provider.dart';
-import '../widgets/home_action_button.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(sessionListProvider);
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Target Analyser'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Session History',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
-            ),
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Stats summary
-            sessionsAsync.whenOrNull(
-                  data: (sessions) => _SummaryBanner(
-                    sessionCount: sessions.length,
-                    totalShots: sessions.fold(0, (s, e) => s + e.totalShots),
-                  ),
-                ) ??
-                const SizedBox.shrink(),
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
-            const SizedBox(height: 32),
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
-            Text(
-              'What would you like to do?',
-              style: context.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 20),
-
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  HomeActionButton(
-                    icon: Icons.add_a_photo_outlined,
-                    label: 'New Session',
-                    onTap: () => _showNewSessionDialog(context, ref),
-                  ),
-                  HomeActionButton(
-                    icon: Icons.history,
-                    label: 'History',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                          builder: (_) => const HistoryScreen()),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+  void _startScan() {
+    if (!_formKey.currentState!.validate()) return;
+    final soldierId = _controller.text.trim();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CameraScreen(soldierId: soldierId),
       ),
     );
   }
 
-  Future<void> _showNewSessionDialog(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final nameController = TextEditingController();
-    final notesController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New Session'),
-        content: Form(
-          key: formKey,
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Session name *',
-                  hintText: 'e.g. Morning practice',
-                ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Name is required' : null,
-                textCapitalization: TextCapitalization.sentences,
+              const Spacer(flex: 2),
+
+              // ── App identity ──────────────────────────────────────────────
+              Icon(
+                Icons.gps_fixed,
+                size: 64,
+                color: cs.primary,
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
+              const SizedBox(height: 16),
+              Text(
+                'Target Analyser',
+                style: tt.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
                 ),
-                maxLines: 2,
-                textCapitalization: TextCapitalization.sentences,
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Enter soldier ID to begin analysis',
+                style: tt.bodyMedium?.copyWith(color: cs.outline),
+                textAlign: TextAlign.center,
+              ),
+
+              const Spacer(flex: 2),
+
+              // ── Soldier ID input ──────────────────────────────────────────
+              Form(
+                key: _formKey,
+                child: TextFormField(
+                  controller: _controller,
+                  textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _startScan(),
+                  decoration: const InputDecoration(
+                    labelText: 'Soldier ID',
+                    hintText: 'e.g. S-1042',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Soldier ID is required';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── Start button ──────────────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: _startScan,
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: const Text(
+                    'Start Scan',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+
+              const Spacer(flex: 3),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx, true);
-              }
-            },
-            child: const Text('Start'),
-          ),
-        ],
       ),
-    );
-
-    if (confirmed != true || !context.mounted) return;
-
-    final result = await ref.read(homeProvider.notifier).createSession(
-          name: nameController.text.trim(),
-          notes: notesController.text.trim().isEmpty
-              ? null
-              : notesController.text.trim(),
-        );
-
-    if (!context.mounted) return;
-
-    result.when(
-      onSuccess: (sessionId) => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => CameraScreen(sessionId: sessionId),
-        ),
-      ),
-      onFailure: (f) => context.showSnackBar(f.message, isError: true),
-    );
-  }
-}
-
-class _SummaryBanner extends StatelessWidget {
-  const _SummaryBanner({
-    required this.sessionCount,
-    required this.totalShots,
-  });
-
-  final int sessionCount;
-  final int totalShots;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _BannerStat(label: 'Sessions', value: sessionCount.toString()),
-            _BannerStat(label: 'Total Shots', value: totalShots.toString()),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BannerStat extends StatelessWidget {
-  const _BannerStat({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: context.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: context.colors.primary,
-          ),
-        ),
-        Text(label, style: context.textTheme.labelMedium),
-      ],
     );
   }
 }
