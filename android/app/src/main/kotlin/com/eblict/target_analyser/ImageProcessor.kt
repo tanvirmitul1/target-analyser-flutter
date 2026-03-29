@@ -47,7 +47,7 @@ class ImageProcessor {
         // Part 2 — HoughCircles
         private const val HC_DP      = 1.2
         private const val HC_PARAM1  = 100.0
-        private const val HC_PARAM2  = 30.0
+        private const val HC_PARAM2  = 35.0
 
         // Part 3 — white-rectangle detection
         private const val WHITE_THRESH    = 200.0
@@ -56,13 +56,13 @@ class ImageProcessor {
         private const val WHITE_MAX_ASPECT = 1.5
 
         // Part 4 — shot contour filters
-        private const val SHOT_MIN_PERIM         = 15.0
-        private const val SHOT_CIRC_MIN          = 0.6
+        private const val SHOT_MIN_PERIM         = 12.0
+        private const val SHOT_CIRC_MIN          = 0.35 // relaxed: real bullet holes are irregular
         private const val SHOT_CIRC_MAX          = 1.3
-        private const val SHOT_MAX_ASPECT_RATIO  = 1.5
+        private const val SHOT_MAX_ASPECT_RATIO  = 2.0  // relaxed: holes can be slightly oval
         private const val SHOT_BORDER_MARGIN     = 5
-        private const val SHOT_WHITE_EXCLUSION   = 15.0  // px, skip if ≤ from white centre
-        private const val SHOT_MERGE_DIST        = 10.0  // px
+        private const val SHOT_WHITE_EXCLUSION   = 6.0   // reduced: was 15 px
+        private const val SHOT_MERGE_DIST        = 12.0  // px
 
         // Part 5 — dynamic area thresholds (fraction of image area)
         private const val AREA_FRAC_MIN = 0.0005
@@ -195,16 +195,17 @@ class ImageProcessor {
         kernel3.release()
 
         // ── Part 2 step 1: HoughCircles for target boundary ───────────────────
+        val minDim = min(W, H)
         val circles = Mat()
         Imgproc.HoughCircles(
             blurred, circles,
             Imgproc.HOUGH_GRADIENT,
             HC_DP,
-            H / 4.0,    // minDist  = rows / 4
+            minDim / 4.0,               // minDist  = shorter dim / 4
             HC_PARAM1,
             HC_PARAM2,
-            H / 6,      // minRadius = rows / 6
-            H / 2,      // maxRadius = rows / 2
+            (minDim * 0.20).toInt(),    // minRadius = 20% of shorter dim
+            (minDim * 0.49).toInt(),    // maxRadius = 49% of shorter dim
         )
         val geom = extractLargestCircle(circles, W, H)
         circles.release()
@@ -268,13 +269,42 @@ class ImageProcessor {
 
     private fun extractLargestCircle(circles: Mat, W: Int, H: Int): TargetGeometry {
         if (!circles.empty() && circles.cols() > 0) {
-            var bestIdx = 0
+            val imgCx  = W / 2.0
+            val imgCy  = H / 2.0
+            // Allow centre to be at most 40% of each image dimension away from middle.
+            val maxDx  = W * 0.40
+            val maxDy  = H * 0.40
+
+            // Pass 1: pick the largest circle whose centre is near the image centre.
+            var bestIdx = -1
             var bestR   = -1.0
             for (i in 0 until circles.cols()) {
                 val d = circles.get(0, i)!!
-                if (d[2] > bestR) { bestR = d[2]; bestIdx = i }
+                val cx = d[0]; val cy = d[1]; val r = d[2]
+                if (Math.abs(cx - imgCx) > maxDx) continue
+                if (Math.abs(cy - imgCy) > maxDy) continue
+                if (r > bestR) { bestR = r; bestIdx = i }
             }
-            val d = circles.get(0, bestIdx)!!
+
+            if (bestIdx >= 0) {
+                val d = circles.get(0, bestIdx)!!
+                return TargetGeometry(
+                    centre          = Point(d[0], d[1]),
+                    radius          = d[2],
+                    circlesDetected = circles.cols(),
+                )
+            }
+
+            // Pass 2 (fallback within detected circles): pick the one closest to centre.
+            Log.w(TAG, "No centre-proximate circle found — choosing closest-to-centre among ${circles.cols()}")
+            var closestIdx  = 0
+            var closestDist = Double.MAX_VALUE
+            for (i in 0 until circles.cols()) {
+                val d    = circles.get(0, i)!!
+                val dist = hypot(d[0] - imgCx, d[1] - imgCy)
+                if (dist < closestDist) { closestDist = dist; closestIdx = i }
+            }
+            val d = circles.get(0, closestIdx)!!
             return TargetGeometry(
                 centre          = Point(d[0], d[1]),
                 radius          = d[2],
