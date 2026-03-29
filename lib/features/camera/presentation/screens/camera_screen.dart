@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/utils/extensions.dart';
 import '../../../result/presentation/screens/result_screen.dart';
@@ -71,6 +72,22 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     final x = details.localPosition.dx / constraints.maxWidth;
     final y = details.localPosition.dy / constraints.maxHeight;
     ref.read(cameraProvider.notifier).setFocusPoint(x, y);
+  }
+
+  // ── Gallery pick ───────────────────────────────────────────────────────────
+
+  Future<void> _pickFromGallery() async {
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+    if (file == null || !mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => ResultScreen(
+          imagePath: file.path,
+          soldierId: widget.soldierId,
+        ),
+      ),
+    );
   }
 
   // ── Capture ────────────────────────────────────────────────────────────────
@@ -188,10 +205,26 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   ),
                   const SizedBox(height: 12),
                 ],
-                CaptureButton(
-                  isCapturing: cameraState.isCapturing,
-                  isReady: cameraState.isReady,
-                  onCapture: _capture,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: _pickFromGallery,
+                      icon: const Icon(
+                        Icons.photo_library_outlined,
+                        color: Colors.white70,
+                        size: 32,
+                      ),
+                      tooltip: 'Upload from gallery',
+                    ),
+                    const SizedBox(width: 24),
+                    CaptureButton(
+                      isCapturing: cameraState.isCapturing,
+                      isReady: cameraState.isReady,
+                      onCapture: _capture,
+                    ),
+                    const SizedBox(width: 24 + 32 + 8),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(

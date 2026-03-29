@@ -1,5 +1,6 @@
 package com.eblict.target_analyser
 
+import android.media.ExifInterface
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
@@ -103,14 +104,41 @@ class ImageProcessor {
         val t0  = System.currentTimeMillis()
         Log.i(TAG, "process() start  path=$imagePath  debug=$debugMode")
 
-        val src = Imgcodecs.imread(imagePath)
+        var src = Imgcodecs.imread(imagePath)
         check(!src.empty()) { "Cannot decode image: $imagePath" }
+
+        // Correct EXIF orientation — Android camera saves portrait images with a
+        // rotation tag; OpenCV imread() ignores it, causing coordinates to shift.
+        src = correctExifRotation(src, imagePath)
 
         return try {
             doProcess(src, outputDir, debugMode, t0)
         } finally {
             src.release()
         }
+    }
+
+    private fun correctExifRotation(src: Mat, imagePath: String): Mat {
+        val orientation = try {
+            ExifInterface(imagePath).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL,
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read EXIF orientation: ${e.message}")
+            ExifInterface.ORIENTATION_NORMAL
+        }
+        val rotateCode = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90  -> Core.ROTATE_90_CLOCKWISE
+            ExifInterface.ORIENTATION_ROTATE_180 -> Core.ROTATE_180
+            ExifInterface.ORIENTATION_ROTATE_270 -> Core.ROTATE_90_COUNTERCLOCKWISE
+            else -> return src
+        }
+        Log.d(TAG, "EXIF orientation=$orientation — applying rotation $rotateCode")
+        val rotated = Mat()
+        Core.rotate(src, rotated, rotateCode)
+        src.release()
+        return rotated
     }
 
     // ── Main pipeline ─────────────────────────────────────────────────────────

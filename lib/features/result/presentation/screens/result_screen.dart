@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:target_analyser/features/analysis/domain/entities/shot_pattern.dart';
+import 'package:target_analyser/features/analysis/domain/entities/shot_pattern.dart' hide ShotPoint;
 import 'package:target_analyser/features/camera/presentation/screens/camera_screen.dart';
 import 'package:target_analyser/features/home/presentation/screens/home_screen.dart';
 import 'package:target_analyser/features/processing/domain/entities/processed_image.dart';
@@ -275,14 +275,13 @@ class _ImageOverlay extends StatelessWidget {
           ),
         ),
 
-        // Clean overlay: centre crosshair + shot marker.
+        // Clean overlay: centre crosshair + all shot markers.
         CustomPaint(
           painter: _ShotOverlayPainter(
             imageSize: nativeSize,
             centreX: processed.centreX,
             centreY: processed.centreY,
-            shotX: processed.shotX,
-            shotY: processed.shotY,
+            allShots: processed.allShots,
           ),
         ),
       ],
@@ -291,21 +290,19 @@ class _ImageOverlay extends StatelessWidget {
 }
 
 /// Maps image-pixel coordinates to widget coordinates (BoxFit.contain), then
-/// draws a crosshair at the target centre and a dot at the shot position.
+/// draws a crosshair at the target centre and dots at every detected shot.
 class _ShotOverlayPainter extends CustomPainter {
   const _ShotOverlayPainter({
     required this.imageSize,
     required this.centreX,
     required this.centreY,
-    required this.shotX,
-    required this.shotY,
+    required this.allShots,
   });
 
   final Size imageSize;
   final double centreX;
   final double centreY;
-  final double shotX;
-  final double shotY;
+  final List<ShotPoint> allShots;
 
   Offset _map(Size widget, double ix, double iy) {
     final scale = math.min(
@@ -320,7 +317,9 @@ class _ShotOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     _drawCrosshair(canvas, _map(size, centreX, centreY));
-    _drawShot(canvas, _map(size, shotX, shotY));
+    for (final shot in allShots) {
+      _drawShot(canvas, _map(size, shot.x, shot.y));
+    }
   }
 
   void _drawCrosshair(Canvas canvas, Offset c) {
@@ -354,8 +353,7 @@ class _ShotOverlayPainter extends CustomPainter {
   bool shouldRepaint(_ShotOverlayPainter old) =>
       old.centreX != centreX ||
       old.centreY != centreY ||
-      old.shotX != shotX ||
-      old.shotY != shotY ||
+      old.allShots != allShots ||
       old.imageSize != imageSize;
 }
 

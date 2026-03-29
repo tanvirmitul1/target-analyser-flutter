@@ -138,14 +138,19 @@ class ScanFlowNotifier extends FamilyNotifier<ScanFlowState, ScanArgs> {
 
     final ShotPattern pattern;
     try {
+      final normShots = processed.allShots.isNotEmpty
+          ? processed.allShots.map((s) {
+              final r = processed.targetRadiusPx;
+              return (
+                x: r == 0 ? 0.0 : (s.x - processed.centreX) / r,
+                y: r == 0 ? 0.0 : (s.y - processed.centreY) / r,
+              );
+            }).toList()
+          : [(x: processed.normalisedOffsetX, y: processed.normalisedOffsetY)];
+
       pattern = const ShotAnalysisService().analyse(
         center: (x: 0.0, y: 0.0),
-        shots: [
-          (
-            x: processed.normalisedOffsetX,
-            y: processed.normalisedOffsetY,
-          ),
-        ],
+        shots: normShots,
       );
     } catch (e, st) {
       AppLogger.e('Shot analysis failed', error: e, stackTrace: st);

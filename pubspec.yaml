@@ -32,6 +32,9 @@ dependencies:
   # Audio playback
   audioplayers: ^6.1.0
 
+  # Image picker (gallery upload)
+  image_picker: ^1.1.0
+
   # Utilities
   uuid: ^4.4.0
   intl: ^0.19.0
