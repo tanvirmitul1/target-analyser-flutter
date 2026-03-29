@@ -47,7 +47,7 @@ android {
         ndk {
             // Limit to modern ABIs — removes x86 (emulator-only) to reduce APK size.
             // Add 'x86_64' back if you need emulator support.
-            abiFilters 'arm64-v8a', 'armeabi-v7a'
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
         }
     }
 

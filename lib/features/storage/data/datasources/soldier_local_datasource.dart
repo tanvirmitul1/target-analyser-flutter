@@ -3,9 +3,9 @@ import 'package:sqflite/sqflite.dart';
 import '../../../../core/constants/db_constants.dart';
 import '../../../../core/services/database_service.dart';
 import '../../../../core/utils/logger.dart';
+import '../../domain/repositories/soldier_repository.dart';
 import '../models/shot_record_model.dart';
 import '../models/soldier_model.dart';
-import '../../domain/repositories/soldier_repository.dart';
 
 /// Raw SQLite access layer.
 ///

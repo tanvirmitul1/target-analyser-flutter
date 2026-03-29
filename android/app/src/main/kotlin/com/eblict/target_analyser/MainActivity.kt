@@ -5,6 +5,7 @@ import android.os.Looper
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.Core
@@ -82,7 +83,7 @@ class MainActivity : FlutterActivity() {
     // ── Handler: processImage ─────────────────────────────────────────────────
 
     private fun handleProcessImage(
-        call: MethodChannel.MethodCall,
+        call: MethodCall,
         result: MethodChannel.Result,
     ) {
         // Guard: OpenCV must be ready.

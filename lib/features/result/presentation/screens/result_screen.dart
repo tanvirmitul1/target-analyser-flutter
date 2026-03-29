@@ -67,12 +67,12 @@ class ResultScreen extends ConsumerWidget {
             step: 3,
             label: 'Saving…',
           ),
-        ScanComplete complete => _CompleteView(
+        final ScanComplete complete => _CompleteView(
             state: complete,
             onScanAgain: () => _scanAgain(context),
             onDone: () => _done(context),
           ),
-        ScanFailed failed => _FailedView(
+        final ScanFailed failed => _FailedView(
             failed: failed,
             onRetry: () =>
                 ref.read(scanFlowProvider(_args).notifier).retry(),

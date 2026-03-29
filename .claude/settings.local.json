@@ -3,7 +3,11 @@
     "allow": [
       "Bash(grep -v \"^.*//.*ImageProcessingDatasource\")",
       "Bash(grep -v \"^.*//.*ShotPattern\")",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(wc -l:*)",
+      "Bash(python:*)",
+      "Bash(py:*)",
+      "Bash(where:*)"
     ]
   }
 }

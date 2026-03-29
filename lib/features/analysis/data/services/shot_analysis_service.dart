@@ -309,7 +309,7 @@ class ShotAnalysisService {
     var centroids = _kMeansPlusPlusInit(points, k: k, rng: rng);
 
     // Assignment lists — reused across iterations.
-    var assignments = List.generate(k, (_) => <_Vec2>[]);
+    final assignments = List.generate(k, (_) => <_Vec2>[]);
 
     for (var iter = 0; iter < _kKMeansMaxIter; iter++) {
       // ── Assign ───────────────────────────────────────────────────────────

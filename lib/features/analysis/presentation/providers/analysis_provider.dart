@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/result.dart';
+import '../../../processing/domain/entities/processed_image.dart';
 import '../../../storage/presentation/providers/storage_provider.dart';
 import '../../data/datasources/analysis_datasource.dart';
 import '../../data/models/analysis_input.dart';
@@ -8,7 +9,6 @@ import '../../data/repositories/analysis_repository_impl.dart';
 import '../../domain/entities/shot_result.dart';
 import '../../domain/repositories/analysis_repository.dart';
 import '../../domain/usecases/analyse_target_usecase.dart';
-import '../../../processing/domain/entities/processed_image.dart';
 
 // ── Infrastructure ────────────────────────────────────────────────────────────
 

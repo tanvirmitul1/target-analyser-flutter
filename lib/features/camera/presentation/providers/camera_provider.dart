@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/logger.dart';
